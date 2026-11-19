@@ -313,7 +313,14 @@ class AuditResult:
 
 
 def classify_risk(leak_pct: float, inflation_pts: float) -> str:
-    """Plain thresholds, stated in the report so readers can disagree with them."""
+    """Plain thresholds, stated in the report so readers can disagree with them.
+
+    A gap between random-split and duplicate-free accuracy only counts when at least 1% of test
+    rows have an exact twin. Below that the two splits are nearly the same, so any gap is noise
+    (small datasets showed false alarms before this rule: Iris and Wine were rated moderate).
+    """
+    if leak_pct < 1.0:
+        inflation_pts = 0.0
     if leak_pct >= 20 or inflation_pts >= 10:
         return "high"
     if leak_pct >= 5 or inflation_pts >= 3:

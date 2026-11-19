@@ -120,6 +120,7 @@ def to_markdown(r: AuditResult, title: str = "Dataset audit") -> str:
         "",
         "---",
         "_Risk rule: high if at least 20% of test rows leak or any model's drop is at least 10 points; "
-        "moderate if at least 5% or 3 points._",
+        "moderate if at least 5% or 3 points. A model's drop counts only when at least 1% of test rows "
+        "leak, because with no twins to memorize any gap is split noise._",
     ]
     return "\n".join(lines) + "\n"

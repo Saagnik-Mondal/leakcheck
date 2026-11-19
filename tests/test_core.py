@@ -207,6 +207,16 @@ def test_compare_splits_reports_zero_for_disjoint_files():
     assert compare_splits(train, test, "label")["test_rows_also_in_train"] == 0
 
 
+def test_risk_ignores_accuracy_gaps_when_nothing_leaks():
+    from leakcheck.core import classify_risk
+
+    assert classify_risk(0.0, 8.0) == "low"  # noisy gap on a tiny dataset, no twins to memorize
+    assert classify_risk(0.8, 12.0) == "low"
+    assert classify_risk(3.0, 4.0) == "moderate"
+    assert classify_risk(2.0, 11.0) == "high"
+    assert classify_risk(25.0, 0.0) == "high"
+
+
 def test_markdown_report_mentions_the_key_numbers():
     md = to_markdown(
         audit(make_duplicated(copies=4, n=300), "label", n_splits=2, near_dup_sample=50)

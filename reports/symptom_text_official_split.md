@@ -34,7 +34,7 @@ Models that smooth over the data (naive Bayes) can be unaffected by repeated row
 _Note: Free-text features: model, near-duplicate and single-feature checks were skipped._
 
 ---
-_Risk rule: high if at least 20% of test rows leak or any model's drop is at least 10 points; moderate if at least 5% or 3 points._
+_Risk rule: high if at least 20% of test rows leak or any model's drop is at least 10 points; moderate if at least 5% or 3 points. A model's drop counts only when at least 1% of test rows leak, because with no twins to memorize any gap is split noise._
 
 ## Official split: `symptom-disease-train-dataset.csv` vs `symptom-disease-test-dataset.csv`
 
