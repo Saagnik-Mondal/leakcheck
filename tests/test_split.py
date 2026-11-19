@@ -65,6 +65,16 @@ def test_dense_near_duplicate_graph_triggers_a_warning():
     assert r.largest_group_pct == pytest.approx(100.0)
 
 
+def test_oversized_group_stays_in_training():
+    # One vector repeated 300 times (30% of the rows) must not become the test set.
+    big = np.tile(random_binary(1, d=30, seed=9), (300, 1))
+    rest = random_binary(700, d=30, seed=10)
+    df = frame(np.vstack([big, rest]))
+    r = safe_split(df, "label", seed=0)
+    assert not np.isin(np.arange(300), r.test).any()
+    assert 0.15 < r.test_fraction < 0.25
+
+
 def test_near_requires_binary_features():
     df = pd.DataFrame({"a": [0.5, 1.5, 2.5], "label": [0, 1, 0]})
     with pytest.raises(ValueError, match="binary"):

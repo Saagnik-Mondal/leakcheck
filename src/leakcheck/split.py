@@ -87,9 +87,14 @@ def safe_split(
     rng = np.random.default_rng(seed)
     in_test = np.zeros(len(sizes), dtype=bool)
     count = 0
+    # A group much bigger than the test set would turn the test set into one cluster, which is
+    # not representative. Such groups stay in training; they cannot be split without leaking.
+    max_group_in_test = 0.25 * target_rows
     for g in rng.permutation(len(sizes)):
         if count >= target_rows:
             break
+        if sizes[g] > max_group_in_test:
+            continue
         if count + sizes[g] <= target_rows * 1.1:
             in_test[g] = True
             count += sizes[g]

@@ -1,0 +1,44 @@
+{
+  "sample_rows": 30000,
+  "distinct_rows": 28003,
+  "splits": [
+    {
+      "split": "Random split",
+      "train_rows": 24000,
+      "test_rows": 6000,
+      "test_rows_with_exact_twin_in_train_pct": 10.183333333333334,
+      "naive_bayes_pct": 68.4,
+      "one_nn_pct": 68.95
+    },
+    {
+      "split": "Exact copies together",
+      "train_rows": 24000,
+      "test_rows": 6000,
+      "test_rows_with_exact_twin_in_train_pct": 0.0,
+      "naive_bayes_pct": 68.30000000000001,
+      "one_nn_pct": 68.25
+    },
+    {
+      "split": "Near-twins together (differ by at most 1 symptom)",
+      "train_rows": 24000,
+      "test_rows": 6000,
+      "test_rows_with_exact_twin_in_train_pct": 0.0,
+      "naive_bayes_pct": 80.10000000000001,
+      "one_nn_pct": 68.95
+    }
+  ],
+  "groups": {
+    "Exact copies together": {
+      "groups": 28003,
+      "largest_group_pct": 0.023333333333333334,
+      "test_fraction_pct": 20.0,
+      "warning": null
+    },
+    "Near-twins together (differ by at most 1 symptom)": {
+      "groups": 11576,
+      "largest_group_pct": 39.94666666666667,
+      "test_fraction_pct": 20.0,
+      "warning": null
+    }
+  }
+}
