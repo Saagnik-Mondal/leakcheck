@@ -1,0 +1,70 @@
+{
+  "rows": 246945,
+  "features": 377,
+  "classes": 773,
+  "target": "diseases",
+  "duplicates": {
+    "rows": 246945,
+    "unique_feature_vectors": 169888,
+    "duplicate_rows": 57298,
+    "duplicate_pct": 23.202737451659278,
+    "conflicting_vectors": 12634,
+    "rows_in_conflict": 39728,
+    "rows_in_conflict_pct": 16.08779282836259,
+    "accuracy_ceiling_pct": 91.62080625240438
+  },
+  "split_leak_rate_pct": 43.991982020287914,
+  "split_leak_rate_std": 0.11508233705361465,
+  "n_splits": 10,
+  "accuracy": {
+    "majority_baseline_pct": 0.49363218530442,
+    "memorizer_random_split_pct": 32.578104436210495,
+    "memorizer_group_split_pct": 0.4101356290099894
+  },
+  "models": [
+    {
+      "name": "Bernoulli naive Bayes",
+      "random_split_pct": 84.30419729089473,
+      "group_split_pct": 84.4920003248599
+    },
+    {
+      "name": "1-nearest-neighbour (can memorize)",
+      "random_split_pct": 76.95,
+      "group_split_pct": 66.5
+    }
+  ],
+  "near_duplicates": {
+    "sampled": 1500,
+    "within_1_pct": 99.0,
+    "within_2_pct": 100.0,
+    "within_3_pct": 100.0,
+    "median_distance": 1.0
+  },
+  "single_feature": {
+    "majority_baseline_pct": 0.49363218530442,
+    "top_features": [
+      [
+        "back pain",
+        0.7560387940634554
+      ],
+      [
+        "knee pain",
+        0.7556338455931483
+      ],
+      [
+        "elbow swelling",
+        0.7532041547713053
+      ],
+      [
+        "difficulty in swallowing",
+        0.752394257830691
+      ],
+      [
+        "constipation",
+        0.752394257830691
+      ]
+    ]
+  },
+  "risk": "high",
+  "notes": []
+}

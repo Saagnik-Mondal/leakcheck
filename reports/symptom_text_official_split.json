@@ -1,0 +1,42 @@
+{
+  "audit": {
+    "rows": 5634,
+    "features": 1,
+    "classes": 866,
+    "target": "label",
+    "duplicates": {
+      "rows": 5634,
+      "unique_feature_vectors": 1993,
+      "duplicate_rows": 3641,
+      "duplicate_pct": 64.62548810791623,
+      "conflicting_vectors": 0,
+      "rows_in_conflict": 0,
+      "rows_in_conflict_pct": 0.0,
+      "accuracy_ceiling_pct": 100.0
+    },
+    "split_leak_rate_pct": 69.95563442768412,
+    "split_leak_rate_std": 1.0326414570346876,
+    "n_splits": 10,
+    "accuracy": {
+      "majority_baseline_pct": 2.6801561945331915,
+      "memorizer_random_split_pct": 71.16237799467613,
+      "memorizer_group_split_pct": 0.5737704918032787
+    },
+    "models": [],
+    "near_duplicates": {},
+    "single_feature": {},
+    "risk": "high",
+    "notes": [
+      "Free-text features: model, near-duplicate and single-feature checks were skipped."
+    ]
+  },
+  "official_split": {
+    "train_rows": 5634,
+    "test_rows": 1409,
+    "test_rows_also_in_train": 980,
+    "test_rows_also_in_train_pct": 69.55287437899219,
+    "overlap_with_same_label_pct": 100.0,
+    "train_internal_duplicate_pct": 64.62548810791621,
+    "test_internal_duplicate_pct": 52.519517388218595
+  }
+}
