@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from .core import design_matrix, row_ids
+from .core import assign_groups, design_matrix, row_ids, union_labels
 
 
 @dataclass
@@ -53,17 +53,20 @@ def safe_split(
     seed: int = 0,
     near: int = 0,
     max_near_rows: int = 30_000,
+    group: str | None = None,
 ) -> SplitResult:
     """Split row positions into train and test with no exact twin across the split.
 
     near=0   keep all copies of an identical feature vector together
     near=k   also keep together vectors that differ in at most k features (binary features only)
+    group    a column naming the patient, user or session each row belongs to: all rows of one
+             group stay on the same side. Identical rows are kept together with their groups too.
 
     If near-duplicates link most of the data into one cluster, no leak-free split of the
     requested size exists. The result then reports it (`largest_group_pct`, `test_fraction`)
     and a warning is raised instead of silently returning a leaky split.
     """
-    features = features or [c for c in df.columns if c != target]
+    features = features or [c for c in df.columns if c not in (target, group)]
     ids = row_ids(df, features)
     uniq, first, inverse = np.unique(ids, return_index=True, return_inverse=True)
 
@@ -81,25 +84,12 @@ def safe_split(
         vector_group = np.arange(len(uniq))
 
     row_group = vector_group[inverse]
+    if group is not None:
+        row_group = union_labels([row_group, pd.factorize(df[group])[0]])
     n = len(df)
     sizes = np.bincount(row_group)
-    target_rows = test_size * n
-    rng = np.random.default_rng(seed)
-    in_test = np.zeros(len(sizes), dtype=bool)
-    count = 0
-    # A group much bigger than the test set would turn the test set into one cluster, which is
-    # not representative. Such groups stay in training; they cannot be split without leaking.
-    max_group_in_test = 0.25 * target_rows
-    for g in rng.permutation(len(sizes)):
-        if count >= target_rows:
-            break
-        if sizes[g] > max_group_in_test:
-            continue
-        if count + sizes[g] <= target_rows * 1.1:
-            in_test[g] = True
-            count += sizes[g]
+    is_test = assign_groups(row_group, test_size, np.random.default_rng(seed))
 
-    is_test = in_test[row_group]
     result = SplitResult(
         train=np.flatnonzero(~is_test),
         test=np.flatnonzero(is_test),

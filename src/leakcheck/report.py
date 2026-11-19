@@ -85,6 +85,33 @@ def to_markdown(r: AuditResult, title: str = "Dataset audit") -> str:
         "Models that smooth over the data (naive Bayes) can be unaffected by repeated rows, while "
         "models that can memorize (nearest neighbour, trees, neural networks) are the ones at risk.",
     ]
+    gc = r.group_check
+    if gc:
+        lines += [
+            "",
+            f"## Group leakage: `{gc['group_column']}`",
+            "",
+            f"{gc['groups']:,} groups, {gc['mean_rows_per_group']:.1f} rows each on average "
+            f"(largest: {gc['largest_group_pct']:.1f}% of the data). Rows of one group are not independent, "
+            "so a random split can leak even when no two rows are identical.",
+            "",
+            f"Over {r.n_splits} random 80/20 splits, **{gc['test_rows_with_group_in_train_pct']:.1f}%** "
+            f"(std {gc['test_rows_with_group_in_train_std']:.2f}) of test rows belong to a group that also "
+            "appears in training.",
+            "",
+            "| Model | Random split | Group-aware split | Drop |",
+            "|---|---:|---:|---:|",
+        ]
+        for m in gc["models"]:
+            drop = m["random_split_pct"] - m["group_aware_pct"]
+            lines.append(
+                f"| {m['name']} | {m['random_split_pct']:.1f}% | {m['group_aware_pct']:.1f}% | {drop:.1f} pts |"
+            )
+        lines += [
+            "",
+            "The group-aware split keeps every group, and any identical rows, on one side. The group column "
+            "is not used as a feature.",
+        ]
     nd = r.near_duplicates
     if nd.get("sampled"):
         lines += [

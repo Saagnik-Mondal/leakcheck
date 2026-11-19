@@ -19,6 +19,9 @@ def main() -> None:
     p.add_argument("csv", type=Path, help="Path to the CSV file.")
     p.add_argument("--target", required=True, help="Name of the label column.")
     p.add_argument("--features", nargs="*", help="Feature columns (default: every other column).")
+    p.add_argument(
+        "--group", help="Column naming the patient, user or session each row belongs to."
+    )
     p.add_argument("--splits", type=int, default=10, help="Random splits to average (default 10).")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument(
@@ -46,6 +49,7 @@ def main() -> None:
         n_splits=args.splits,
         seed=args.seed,
         fit_models=not args.no_model,
+        group=args.group,
     )
     md = to_markdown(result, title=f"Audit of {args.csv.name}")
     if args.test:

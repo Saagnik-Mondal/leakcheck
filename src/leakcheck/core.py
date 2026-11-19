@@ -288,6 +288,56 @@ def compare_splits(
     }
 
 
+# --------------------------------------------------------------------------- grouping helpers
+
+
+def union_labels(keys: list[np.ndarray]) -> np.ndarray:
+    """One label per row so that rows sharing a value in ANY of the key arrays share a label.
+
+    Keeps rows together when several things must not straddle a split at once, for example a
+    patient and an identical feature vector that also appears under another patient.
+    """
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    n = len(keys[0])
+    rows = [np.empty(0, dtype=np.int64)]
+    cols = [np.empty(0, dtype=np.int64)]
+    for k in keys:
+        k = np.asarray(k)
+        order = np.argsort(k, kind="stable")
+        sorted_k = k[order]
+        same = sorted_k[1:] == sorted_k[:-1]
+        rows.append(order[:-1][same])
+        cols.append(order[1:][same])
+    r, c = np.concatenate(rows), np.concatenate(cols)
+    graph = coo_matrix((np.ones(len(r), dtype=np.int8), (r, c)), shape=(n, n))
+    return connected_components(graph, directed=False)[1]
+
+
+def assign_groups(row_group: np.ndarray, test_size: float, rng: np.random.Generator) -> np.ndarray:
+    """Pick whole groups for the test set until it holds about `test_size` of the rows.
+
+    A group bigger than a quarter of the test set would turn the test set into one cluster, which
+    is not representative. Such groups stay in training; they cannot be split without leaking.
+    Returns a boolean array: True where the row is in the test set.
+    """
+    sizes = np.bincount(row_group)
+    target_rows = test_size * len(row_group)
+    in_test = np.zeros(len(sizes), dtype=bool)
+    count = 0
+    max_group_in_test = 0.25 * target_rows
+    for g in rng.permutation(len(sizes)):
+        if count >= target_rows:
+            break
+        if sizes[g] > max_group_in_test:
+            continue
+        if count + sizes[g] <= target_rows * 1.1:
+            in_test[g] = True
+            count += sizes[g]
+    return in_test[row_group]
+
+
 # --------------------------------------------------------------------------- the audit
 
 
@@ -304,6 +354,7 @@ class AuditResult:
     accuracy: dict = field(default_factory=dict)
     models: list = field(default_factory=list)  # [{"name", "random_split_pct", "group_split_pct"}]
     near_duplicates: dict = field(default_factory=dict)
+    group_check: dict = field(default_factory=dict)
     single_feature: dict = field(default_factory=dict)
     risk: str = "unknown"
     notes: list[str] = field(default_factory=list)
@@ -338,9 +389,15 @@ def audit(
     near_dup_sample: int = 1500,
     knn_sample: int = 2000,
     fit_models: bool = True,
+    group: str | None = None,
 ) -> AuditResult:
-    """Run the full audit on a labelled dataframe."""
-    features = features or [c for c in df.columns if c != target]
+    """Run the full audit on a labelled dataframe.
+
+    group: optional column naming the entity each row belongs to (a patient, user or session).
+    Rows of one entity are not independent, so a random split leaks even when no two rows are
+    identical. The group column is excluded from the features.
+    """
+    features = features or [c for c in df.columns if c not in (target, group)]
     rng = np.random.default_rng(seed)
     y_codes, classes = pd.factorize(df[target])
     y = np.asarray(y_codes)
@@ -391,15 +448,82 @@ def audit(
     if x is not None:
         result.single_feature = single_feature_scan(df, features, y)
 
+    if group is not None:
+        result.group_check = _group_check(
+            df,
+            group,
+            ids,
+            y,
+            x,
+            binary,
+            rnd_tr,
+            rnd_te,
+            n_splits,
+            test_size,
+            rng,
+            knn_sample,
+            fit_models,
+        )
+
     drops = [m["random_split_pct"] - m["group_split_pct"] for m in result.models]
+    if result.group_check:
+        drops += [
+            m["random_split_pct"] - m["group_aware_pct"] for m in result.group_check["models"]
+        ]
     inflation = (
         max(drops)
         if drops
         else (acc["memorizer_random_split_pct"] - acc["memorizer_group_split_pct"])
     )
-    result.risk = classify_risk(result.split_leak_rate_pct, inflation)
+    leak_pct = result.split_leak_rate_pct
+    if result.group_check:
+        leak_pct = max(leak_pct, result.group_check["test_rows_with_group_in_train_pct"])
+    result.risk = classify_risk(leak_pct, inflation)
     if x is None:
         result.notes.append(
             "Free-text features: model, near-duplicate and single-feature checks were skipped."
         )
     return result
+
+
+def _group_check(
+    df, group, ids, y, x, binary, rnd_tr, rnd_te, n_splits, test_size, rng, knn_sample, fit_models
+) -> dict:
+    """Leakage through a shared group (patient, user, session) rather than identical rows."""
+    n = len(df)
+    codes = pd.factorize(df[group])[0]
+    sizes = np.bincount(codes)
+    leaks = [leak_rate(codes, *random_split(n, rng, test_size)) for _ in range(n_splits)]
+    # A split that keeps each group, and any identical rows, on one side.
+    labels = union_labels([np.unique(ids, return_inverse=True)[1], codes])
+    is_test = assign_groups(labels, test_size, rng)
+    g_tr, g_te = np.flatnonzero(~is_test), np.flatnonzero(is_test)
+    models = []
+    if x is not None and fit_models:
+        nb = "Bernoulli naive Bayes" if binary else "Gaussian naive Bayes"
+        models.append(
+            {
+                "name": nb,
+                "random_split_pct": 100.0 * naive_bayes_accuracy(x, y, rnd_tr, rnd_te, binary),
+                "group_aware_pct": 100.0 * naive_bayes_accuracy(x, y, g_tr, g_te, binary),
+            }
+        )
+        models.append(
+            {
+                "name": "1-nearest-neighbour (can memorize)",
+                "random_split_pct": 100.0
+                * knn1_accuracy(x, y, rnd_tr, rnd_te, knn_sample, rng, standardize=not binary),
+                "group_aware_pct": 100.0
+                * knn1_accuracy(x, y, g_tr, g_te, knn_sample, rng, standardize=not binary),
+            }
+        )
+    return {
+        "group_column": group,
+        "groups": int(len(sizes)),
+        "mean_rows_per_group": float(sizes.mean()),
+        "largest_group_pct": 100.0 * float(sizes.max() / n),
+        "test_rows_with_group_in_train_pct": 100.0 * float(np.mean(leaks)),
+        "test_rows_with_group_in_train_std": 100.0 * float(np.std(leaks)),
+        "group_aware_test_fraction_pct": 100.0 * float(is_test.mean()),
+        "models": models,
+    }
