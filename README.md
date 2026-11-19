@@ -71,6 +71,32 @@ print(to_markdown(result))
 
 Features can be numeric, boolean or categorical. Free-text features get the duplicate and split checks, and the model-based ones are skipped.
 
+## Does it cry wolf?
+
+A leakage detector is only useful if it stays quiet on clean data. Audits of well-known datasets that ship with scikit-learn ([`reports/clean_baselines.md`](reports/clean_baselines.md)):
+
+| Dataset | Rows | Exact duplicate rows | Test rows with an exact twin | Verdict |
+|---|---:|---:|---:|---|
+| Iris | 150 | 1 (0.7%) | 0.8% | low |
+| Wine | 178 | 0 | 0.0% | low |
+| Breast cancer (Wisconsin) | 569 | 0 | 0.0% | low |
+| Digits (8x8 images) | 1,797 | 0 | 0.0% | low |
+
+The first version of the risk rule rated Iris and Wine "moderate". On 150-row datasets the random and duplicate-free splits differ by noise, and a gap of 3 points was enough to trigger the rating. A model's drop now only counts when at least 1% of test rows have an exact twin (see the [changelog](CHANGELOG.md)).
+
+## Fixing it: `safe_split`
+
+```python
+from leakcheck import safe_split
+
+split = safe_split(df, target="label", test_size=0.2, near=0)
+train, test = df.iloc[split.train], df.iloc[split.test]
+```
+
+`near=0` keeps every copy of an identical row on the same side. `near=k` also keeps together rows that differ in at most `k` features (binary features, up to 30,000 distinct rows). If near-duplicates chain most of the data into one cluster, it warns instead of returning a leaky split.
+
+**A limit worth knowing.** On a 30,000-row sample of dataset 1, grouping rows that differ by one symptom puts **39.9% of the rows into a single cluster**. That cluster cannot be split without leaking, so it stays in training, and the test set is drawn from the remaining, easier rows. Naive Bayes then scores 80.1% instead of 68.3%, which says nothing about the model and everything about the test set. For this data no representative leak-free split exists at distance 1, so the honest approach is to report the exact-copy split and state the limitation. Details: [`reports/near_duplicate_split.md`](reports/near_duplicate_split.md). (A sample has fewer exact twins than the full file, 10.2% against 44.0%, so effects here are smaller than on the full data.)
+
 ## Reproduce the findings
 
 ```bash
@@ -83,7 +109,7 @@ uv run python analysis/audit_public.py   # downloads about 190 MB, then writes r
 - Row identity is a 64-bit hash of a row's feature values (the label is excluded), so two rows match only if every feature matches.
 - The "duplicate-free split" keeps identical rows together, so no test row has an exact twin in training. It does not remove near-duplicates; section 4 of each report measures those separately.
 - The models are deliberately simple so the audit runs on a laptop in about a minute. They show how much of a score is memory, not what the best possible model would score.
-- Metrics, splits and the ceiling calculation are written in numpy and pandas, and tested against synthetic datasets with known answers (18 tests).
+- Metrics, splits and the ceiling calculation are written in numpy and pandas, and tested against synthetic datasets with known answers (26 tests).
 - It detects overlap inside the data you give it. It cannot tell whether your data overlaps with a different dataset, or whether a model was trained on your test set.
 
 ## License
