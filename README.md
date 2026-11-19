@@ -48,6 +48,7 @@ These are facts about the files as published, measured by the code in this repo.
 4. **Near-duplicates:** for test rows with no exact twin, how many features differ from the nearest training row (binary features).
 5. **Single-feature scan:** how well one feature alone predicts the label. An unusually strong one often means an ID, a post-outcome measurement or a copy of the label.
 6. **Official splits:** how much of a provided test file already appears in the provided train file (`--test`).
+7. **Groups:** with a `--group` column (patient, user, session), how many test rows belong to a group that is also in training.
 
 ## Use it
 
@@ -97,6 +98,34 @@ train, test = df.iloc[split.train], df.iloc[split.test]
 
 **A limit worth knowing.** On a 30,000-row sample of dataset 1, grouping rows that differ by one symptom puts **39.9% of the rows into a single cluster**. That cluster cannot be split without leaking, so it stays in training, and the test set is drawn from the remaining, easier rows. Naive Bayes then scores 80.1% instead of 68.3%, which says nothing about the model and everything about the test set. For this data no representative leak-free split exists at distance 1, so the honest approach is to report the exact-copy split and state the limitation. Details: [`reports/near_duplicate_split.md`](reports/near_duplicate_split.md). (A sample has fewer exact twins than the full file, 10.2% against 44.0%, so effects here are smaller than on the full data.)
 
+## Patient-level leakage: the `group` column
+
+Many datasets have several rows per patient, user or session. Those rows are not independent, so a random split puts one visit in training and another in testing, and a model can score well just by recognising the person. No rows need to be identical for this to happen, so the checks above would not notice it.
+
+```python
+from leakcheck import audit, safe_split
+
+result = audit(df, target="diagnosis", group="patient_id")
+split = safe_split(df, target="diagnosis", group="patient_id")
+```
+
+```bash
+leakcheck visits.csv --target diagnosis --group patient_id
+```
+
+The audit reports how many test rows belong to a group that also appears in training, and compares accuracy on a random split with a group-aware one. `safe_split(group=...)` keeps every group on one side, together with any identical rows from other groups. The group column is never used as a feature.
+
+A made-up clinic shows the point ([`reports/group_demo.md`](reports/group_demo.md); this is synthetic data, not a finding about any real dataset). There are 200 patients with 6 visits each, no two rows identical, and diagnoses assigned at random per patient, so nothing can be learned across patients and chance is 20%:
+
+| | Without `group` | With `group="patient_id"` |
+|---|---:|---:|
+| Test rows whose patient is also in training | not checked | 100.0% |
+| 1-nearest-neighbour, random split | 100.0% | 100.0% |
+| 1-nearest-neighbour, group-aware split | not available | 23.8% |
+| Verdict | low | high |
+
+Without the group column the audit sees nothing wrong. With it, a score of 100% turns out to be recognising patients.
+
 ## Reproduce the findings
 
 ```bash
@@ -109,7 +138,7 @@ uv run python analysis/audit_public.py   # downloads about 190 MB, then writes r
 - Row identity is a 64-bit hash of a row's feature values (the label is excluded), so two rows match only if every feature matches.
 - The "duplicate-free split" keeps identical rows together, so no test row has an exact twin in training. It does not remove near-duplicates; section 4 of each report measures those separately.
 - The models are deliberately simple so the audit runs on a laptop in about a minute. They show how much of a score is memory, not what the best possible model would score.
-- Metrics, splits and the ceiling calculation are written in numpy and pandas, and tested against synthetic datasets with known answers (26 tests).
+- Metrics, splits and the ceiling calculation are written in numpy and pandas, and tested against synthetic datasets with known answers (34 tests).
 - It detects overlap inside the data you give it. It cannot tell whether your data overlaps with a different dataset, or whether a model was trained on your test set.
 
 ## License

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 - 2026-11-19
+
+### Added
+- `group` column support in `audit` and `safe_split` (and `--group` on the command line) for patient-, user- or session-level leakage. The audit reports how many test rows belong to a group that also appears in training and compares random and group-aware splits. `safe_split` keeps each group on one side, together with any identical rows from other groups. Closes #1.
+- A synthetic demonstration (`analysis/group_demo.py`): a made-up clinic where the audit without `group` says "low" and with it says "high".
+- Two grouping helpers, `union_labels` and `assign_groups`, shared by the audit and `safe_split`.
+- 8 tests (34 in total).
+
 ## 0.2.0 - 2026-11-19
 
 ### Added

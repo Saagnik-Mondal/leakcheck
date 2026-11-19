@@ -1,6 +1,6 @@
 [project]
 name = "leakcheck"
-version = "0.2.0"
+version = "0.3.0"
 description = "Audit a labelled dataset for duplicates and train/test leakage before you trust its accuracy."
 readme = "README.md"
 requires-python = ">=3.10"
